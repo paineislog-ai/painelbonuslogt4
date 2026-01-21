@@ -1,0 +1,41 @@
+{
+  "OUTUBRO": {
+    "financeiro": true,
+    "qualidade": true,
+    "organizacao_da_loja": true,
+    "Liderança & Organização": true,
+    "producao_por_cidade": {
+      "SÃO LUIS": false,
+      "TIMON": false,
+      "PRESIDENTE DUTRA": true,
+      "AÇAILÂNDIA": false,
+      "CAROLINA": true
+    }
+  },
+  "NOVEMBRO": {
+    "financeiro": false,
+    "qualidade": true,
+    "organizacao_da_loja": true,
+    "Liderança & Organização": true,
+    "producao_por_cidade": {
+      "SÃO LUIS": true,
+      "TIMON": false,
+      "PRESIDENTE DUTRA": true,
+      "AÇAILÂNDIA": true,
+      "CAROLINA": true
+    }
+  },
+  "DEZEMBRO": {
+    "financeiro": true,
+    "qualidade": true,
+    "organizacao_da_loja": true,
+    "Liderança & Organização": true,
+    "producao_por_cidade": {
+      "SÃO LUIS": true,
+      "TIMON": false,
+      "PRESIDENTE DUTRA": true,
+      "AÇAILÂNDIA": true,
+      "CAROLINA": true
+    }
+  }
+}
