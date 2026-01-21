@@ -103,13 +103,13 @@ def ler_planilha(mes: str) -> pd.DataFrame:
 
 # ===================== REGRAS (QUALIDADE % POR CIDADE) =====================
 # AÇAILÂNDIA - 3,5% / 1,5%
-# CAROLINA     - 5%   / 2%
+# CAROLINA MARANHÃO - 5%   / 2%
 # PRESIDENTE DUTRA     - 5% / 2%
 # SÃO LUÍS - 3,5% / 1,5%
 # TIMON - 5% / 2%
 LIMITES_QUALIDADE_POR_CIDADE = {
     up("AÇAILÂNDIA"): {"total": 0.035, "graves": 0.015},
-    up("CAROLINA"): {"total": 0.05, "graves": 0.02},
+    up("CAROLINA MARANHÃO"): {"total": 0.05, "graves": 0.02},
     up("PRESIDENTE DUTRA"): {"total": 0.05, "graves": 0.02},
     up("SÃO LUÍS"): {"total": 0.035, "graves": 0.015},
     up("SAO LUIS"): {"total": 0.035, "graves": 0.015},  # fallback sem acento
@@ -426,3 +426,4 @@ for idx, row in dados_view.iterrows():
             st.caption(f"🗒️ {obs_txt}")
         if perdidos_txt and "100%" not in perdidos_txt:
             st.caption(f"🔻 Indicadores não entregues: {perdidos_txt}")
+
