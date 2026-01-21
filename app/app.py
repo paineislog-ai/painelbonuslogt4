@@ -2,41 +2,52 @@ import streamlit as st
 import pandas as pd
 import json
 from pathlib import Path
-import unicodedata, re
 
-# ================ CONFIG ================
-st.set_page_config(page_title="Painel de Bônus - Tokyo (T4)", layout="wide")
-st.title("🚀 Painel de Bônus Trimestral - Tokyo")
+# ===================== CONFIG BÁSICA =====================
+st.set_page_config(page_title="Painel de Bônus - LOG (T4)", layout="wide")
+st.title("🚀 Painel de Bônus Trimestral - LOG")
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
 
-# ================ HELPERS DE TEXTO ================
-def norm_txt(s: str) -> str:
-    if s is None or (isinstance(s, float) and pd.isna(s)):
-        return ""
-    s = str(s).strip().upper()
-    s = unicodedata.normalize("NFD", s)
-    s = "".join(ch for ch in s if unicodedata.category(ch) != "Mn")
-    s = re.sub(r"\s+", " ", s)
-    return s
+# ===================== MAPA DE SUPERVISORES =====================
+SUPERVISORES_CIDADES = {
+    "MARTA OLIVEIRA COSTA RAMOS": {"SÃO LUÍS": 0.10, "CAROLINA": 0.10},
+    "ELEILSON DE SOUSA ADELINO": {
+        "TIMON": 0.0666,
+        "PRESIDENTE DUTRA": 0.0666,
+        "AÇAILÂNDIA": 0.0666
+    }
+}
 
-def up(s):
-    return norm_txt(s)
+# ===================== CARREGAMENTO ======================
+def load_json(path):
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
 
-def is_org_loja(item: str) -> bool:
-    k = norm_txt(item)
-    return "ORGANIZACAO DA LOJA" in k
+try:
+    PESOS = load_json(DATA_DIR / "pesos_log.json")
+    INDICADORES = load_json(DATA_DIR / "empresa_indicadores_log.json")
+except Exception as e:
+    st.error(f"Erro ao carregar JSONs: {e}")
+    st.stop()
 
-def is_lider_org(item: str) -> bool:
-    k = norm_txt(item)
-    return ("LIDERANCA" in k) and ("ORGANIZACAO" in k)
+MESES = ["TRIMESTRE", "OUTUBRO", "NOVEMBRO", "DEZEMBRO"]
+filtro_mes = st.radio("📅 Selecione o mês:", MESES, horizontal=True)
+
+def ler_planilha(mes: str) -> pd.DataFrame:
+    return pd.read_excel(DATA_DIR / "RESUMO PARA PAINEL - LOG.xlsx", sheet_name=mes)
+
+def up(x):
+    return "" if pd.isna(x) else str(x).strip().upper()
 
 def texto_obs(valor):
     if pd.isna(valor):
         return ""
     s = str(valor).strip()
-    return "" if s.lower() in ["nan", "none", ""] else s
+    if s.lower() in ["none", "nan", ""]:
+        return ""
+    return s
 
 def int_safe(x):
     try:
@@ -44,76 +55,18 @@ def int_safe(x):
     except Exception:
         return 0
 
-def pct_safe(x):
-    """
-    Garante que o valor venha como FRAÇÃO.
-    - Se vier 0.035, mantém (3,5%)
-    - Se vier 3.5, converte para 0.035
-    """
-    try:
-        x = float(x)
-        if x > 1:
-            return x / 100.0
-        return x
-    except Exception:
-        return 0.0
-
-def fmt_pct(x):
-    try:
-        return f"{float(x) * 100:.2f}%"
-    except Exception:
-        return "0.00%"
-
-# ================ SUPERVISOR(ES) E SUAS CIDADES ================
-# MADSON: Produção (20%) dividida igualmente: 10% Ribamar + 10% Chapadinha
-_SUPERVISORES_CIDADES_RAW = {
-    "MADSON RONNY PEREIRA MELO": {
-        "SÃO JOSÉ DE RIBAMAR": 0.5,   # 50% da parcela de Produção
-        "CHAPADINHA": 0.5            # 50% da parcela de Produção
-    }
-}
-SUPERVISORES_CIDADES = {
-    norm_txt(nome): {norm_txt(cidade): peso for cidade, peso in cidades.items()}
-    for nome, cidades in _SUPERVISORES_CIDADES_RAW.items()
-}
-
-# ================ LOAD JSONS ================
-def load_json(path):
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
-
-try:
-    PESOS = load_json(DATA_DIR / "pesos_tokyofilial.json")  # pesos e metas por função
-    INDICADORES = load_json(DATA_DIR / "empresa_indicadores_tokyofilial.json")  # status por mês/cidade
-except Exception as e:
-    st.error(f"Erro ao carregar JSONs: {e}")
-    st.stop()
-
-MESES = ["TRIMESTRE", "JULHO", "AGOSTO", "SETEMBRO"]
-filtro_mes = st.radio("📅 Selecione o mês:", MESES, horizontal=True)
-
-def ler_planilha(mes: str) -> pd.DataFrame:
-    base = DATA_DIR / "RESUMO PARA PAINEL - TOKYO FILIAL.xlsx"
-    if base.exists():
-        return pd.read_excel(base, sheet_name=mes)
-    candidatos = list(DATA_DIR.glob("RESUMO PARA PAINEL - TOKYO FILIAL*.xls*"))
-    if not candidatos:
-        st.error("Planilha não encontrada na pasta data/")
-        st.stop()
-    return pd.read_excel(sorted(candidatos)[0], sheet_name=mes)
-
-# ================ REGRAS (QUALIDADE EM %) POR CIDADE ================
-# BARRA DO CORDA - 3,5% / 1,5%
-# CHAPADINHA     - 5%   / 2%
-# SANTA INÊS     - 3,5% / 1,5%
-# SÃO JOÃO DOS PATOS - 3,5% / 1,5%
-# SÃO JOSÉ DE RIBAMAR - 3,5% / 1,5%
+# ===================== REGRAS (por mês) ==================
+# AÇAILÂNDIA - 3,5% / 1,5%
+# CAROLINA     - 5%   / 2%
+# PRESIDENTE DUTRA     - 5% / 2%
+# SÃO LUIS - 3,5% / 1,5%
+# TIMON - 5% / 2%
 LIMITES_QUALIDADE_POR_CIDADE = {
-    up("BARRA DO CORDA"): {"total": 0.035, "graves": 0.015},
-    up("CHAPADINHA"): {"total": 0.05, "graves": 0.02},
-    up("SANTA INÊS"): {"total": 0.035, "graves": 0.015},
-    up("SÃO JOÃO DOS PATOS"): {"total": 0.035, "graves": 0.015},
-    up("SÃO JOSÉ DE RIBAMAR"): {"total": 0.035, "graves": 0.015},
+    up("AÇAILÂNDIA"): {"total": 0.035, "graves": 0.015},
+    up("CAROLINA"): {"total": 0.05, "graves": 0.02},
+    up("PRESIDENTE DUTRA"): {"total": 0.05, "graves": 0.02},
+    up("SÃO LUIS"): {"total": 0.035, "graves": 0.015},
+    up("TIMON"): {"total": 0.05, "graves": 0.02},
 }
 
 # fallback (se a cidade vier diferente/sem cadastro)
@@ -283,25 +236,23 @@ def calcula_mes(df_mes, nome_mes):
     calc = df.apply(calcula_recebido, axis=1)
     return pd.concat([df.reset_index(drop=True), calc], axis=1)
 
-# ================ TRIMESTRE OU MÊS ================
+# ===================== LEITURA MÚLTIPLA =====================
 if filtro_mes == "TRIMESTRE":
-    df_j, df_a, df_s = [ler_planilha(m) for m in ["JULHO", "AGOSTO", "SETEMBRO"]]
-    st.success("✅ Planilhas carregadas (TRIMESTRE)")
+    df_j, df_a, df_s = [ler_planilha(m) for m in ["OUTUBRO", "NOVEMBRO", "DEZEMBRO"]]
+    st.success("✅ Planilhas carregadas com sucesso!")
     dados_full = pd.concat([
-        calcula_mes(df_j, "JULHO"),
-        calcula_mes(df_a, "AGOSTO"),
-        calcula_mes(df_s, "SETEMBRO")
+        calcula_mes(df_j, "OUTUBRO"),
+        calcula_mes(df_a, "NOVEMBRO"),
+        calcula_mes(df_s, "DEZEMBRO")
     ], ignore_index=True)
 
     group_cols = ["CIDADE", "NOME", "FUNÇÃO", "DATA DE ADMISSÃO", "TEMPO DE CASA"]
-    agg = (dados_full
-           .groupby(group_cols, dropna=False)
-           .agg({"META": "sum", "RECEBIDO": "sum", "PERDA": "sum",
-                 "_obs": lambda x: ", ".join(sorted({s for s in x if s})),
-                 "_badge": lambda x: " / ".join(sorted({s for s in x if s}))})
-           .reset_index())
+    agg = dados_full.groupby(group_cols, dropna=False).agg({
+        "META": "sum", "RECEBIDO": "sum", "PERDA": "sum",
+        "_obs": lambda x: ", ".join({s for s in x if s}),
+        "_badge": lambda x: " / ".join({s for s in x if s})
+    }).reset_index()
     agg["%"] = agg.apply(lambda r: 0 if r["META"] == 0 else (r["RECEBIDO"]/r["META"])*100, axis=1)
-
     perdas_pessoa = (
         dados_full.assign(_lost=lambda d: d.apply(
             lambda r: [f"{it} ({r['MES']})" for it in r["perdeu_itens"]],
@@ -315,42 +266,45 @@ if filtro_mes == "TRIMESTRE":
     dados_calc = agg.merge(perdas_pessoa, on=group_cols, how="left").fillna("")
 else:
     df_mes = ler_planilha(filtro_mes)
-    st.success(f"✅ Planilha carregada ({filtro_mes})")
+    st.success(f"✅ Planilha de {filtro_mes} carregada!")
     dados_calc = calcula_mes(df_mes, filtro_mes)
     dados_calc["INDICADORES_NAO_ENTREGUES"] = dados_calc["perdeu_itens"].apply(
         lambda L: ", ".join(L) if isinstance(L, list) and L else ""
     )
 
-# ================ FILTROS VISUAIS ================
+# ===================== FILTROS =====================
 st.markdown("### 🔎 Filtros")
-c1, c2, c3, c4 = st.columns(4)
-with c1:
-    f_nome = st.text_input("Buscar por nome", "")
-with c2:
-    f_func = st.selectbox("Função", ["Todas"] + sorted(PESOS.keys()))
-with c3:
-    f_cid = st.selectbox("Cidade", ["Todas"] + sorted(dados_calc["CIDADE"].dropna().unique()))
-with c4:
-    f_tempo = st.selectbox("Tempo de casa", ["Todos"] + sorted(dados_calc["TEMPO DE CASA"].dropna().unique()))
+col1, col2, col3, col4 = st.columns(4)
+with col1:
+    filtro_nome = st.text_input("Buscar por nome (contém)", "")
+with col2:
+    funcoes_validas = [f for f in dados_calc["FUNÇÃO"].dropna().unique() if up(f) in PESOS.keys()]
+    filtro_funcao = st.selectbox("Função", ["Todas"] + sorted(funcoes_validas))
+with col3:
+    cidades = ["Todas"] + sorted(dados_calc["CIDADE"].dropna().unique())
+    filtro_cidade = st.selectbox("Cidade", cidades)
+with col4:
+    tempos = ["Todos"] + sorted(dados_calc["TEMPO DE CASA"].dropna().unique())
+    filtro_tempo = st.selectbox("Tempo de casa", tempos)
 
 dados_view = dados_calc.copy()
-if f_nome:
-    dados_view = dados_view[dados_view["NOME"].str.contains(f_nome, case=False, na=False)]
-if f_func != "Todas":
-    dados_view = dados_view[dados_view["FUNÇÃO"] == f_func]
-if f_cid != "Todas":
-    dados_view = dados_view[dados_view["CIDADE"] == f_cid]
-if f_tempo != "Todos":
-    dados_view = dados_view[dados_view["TEMPO DE CASA"] == f_tempo]
+if filtro_nome:
+    dados_view = dados_view[dados_view["NOME"].str.contains(filtro_nome, case=False, na=False)]
+if filtro_funcao != "Todas":
+    dados_view = dados_view[dados_view["FUNÇÃO"] == filtro_funcao]
+if filtro_cidade != "Todas":
+    dados_view = dados_view[dados_view["CIDADE"] == filtro_cidade]
+if filtro_tempo != "Todos":
+    dados_view = dados_view[dados_view["TEMPO DE CASA"] == filtro_tempo]
 
-# ================ RESUMO ====================
+# ===================== RESUMO =====================
 st.markdown("### 📊 Resumo Geral")
-r1, r2, r3 = st.columns(3)
-with r1: st.success(f"💰 Total possível: R$ {dados_view['META'].sum():,.2f}")
-with r2: st.info(f"📈 Recebido: R$ {dados_view['RECEBIDO'].sum():,.2f}")
-with r3: st.error(f"📉 Deixou de ganhar: R$ {dados_view['PERDA'].sum():,.2f}")
+colA, colB, colC = st.columns(3)
+with colA: st.success(f"💰 Total possível: R$ {dados_view['META'].sum():,.2f}")
+with colB: st.info(f"📈 Recebido: R$ {dados_view['RECEBIDO'].sum():,.2f}")
+with colC: st.error(f"📉 Deixou de ganhar: R$ {dados_view['PERDA'].sum():,.2f}")
 
-# ================ CARDS ====================
+# ===================== CARDS =====================
 st.markdown("### 👥 Colaboradores")
 cols = st.columns(3)
 dados_view = dados_view.sort_values(by="%", ascending=False)
@@ -374,8 +328,8 @@ for idx, row in dados_view.iterrows():
             <strong>Recebido:</strong> R$ {recebido:,.2f}<br>
             <strong>Deixou de ganhar:</strong> R$ {perdido:,.2f}<br>
             <strong>Cumprimento:</strong> {pct:.1f}%</p>
-            <div style="height:10px;background:#ddd;border-radius:5px;overflow:hidden;">
-                <div style="width:{pct:.1f}%;background:black;height:100%;"></div>
+            <div style="height: 10px; background: #ddd; border-radius: 5px;">
+                <div style="width:{pct:.1f}%; background:black; height:100%;"></div>
             </div>
         </div>
         """, unsafe_allow_html=True)
